@@ -1,18 +1,35 @@
-name: Wallapop Bot
-on:
-  schedule:
-    - cron: '*/10 * * * *' # Every 10 minutes
-  workflow_dispatch: # Allows manual trigger
-jobs:
-  run-bot:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      - name: Install dependencies
-        run: pip install requests cloudscraper beautifulsoup4
-      - name: Execute script
-        run: python bot.py
+import requests
+import cloudscraper
+from bs4 import BeautifulSoup
+
+# Configuration
+TOKEN = "8556880350:AAETW_gWc8hWjvX_PT_GNFevOfswzX2xocc"
+CHAT_ID = "6672418741"
+URL = "https://es.wallapop.com/app/search?keywords=iphone%2012&max_sale_price=500"
+
+def check_site():
+    scraper = cloudscraper.create_scraper()
+    try:
+        response = scraper.get(URL)
+        # Fixed the typos here: BeautifulSoup and html.parser
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        item = soup.select_one('a.ItemCardList__item')
+        if item:
+            title = item.get('title', 'No title')
+            link = item.get('href', '')
+            price_element = item.select_one('.ItemCard__price')
+            price = price_element.text.strip() if price_element else "N/A"
+            
+            # Fixed the link formatting
+            full_link = f"https://es.wallapop.com{link}" if link.startswith('/') else link
+            
+            message = f"NEW ITEM ALERT!\n\nProduct: {title}\nPrice: {price}\nLink: {full_link}"
+            
+            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                          data={"chat_id": CHAT_ID, "text": message})
+    except Exception as e:
+        print(f"Error: {e}")
+
+if __name__ == "__main__":
+    check_site()
